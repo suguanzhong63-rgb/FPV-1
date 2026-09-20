@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>航模電池換算器</title>
+
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#f4f7fb;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}
+header{padding:22px 18px 12px;background:#111827;position:sticky;top:0;z-index:3}h1{font-size:22px;margin:0 0 5px}.sub{font-size:12px;color:#aab4c5}
+main{max-width:720px;margin:auto;padding:14px 14px 40px}.card{background:#151d2d;border:1px solid #273247;border-radius:16px;padding:16px;margin:12px 0}
+h2{font-size:17px;margin:0 0 12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-size:12px;color:#aeb8c8;display:block;margin:4px 0}input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #354158;background:#0e1524;color:#fff;font-size:16px}
+.result{margin-top:12px;padding:12px;border-radius:10px;background:#0d1422;border-left:4px solid #5eead4}.big{font-size:21px;font-weight:700}
+.small{font-size:12px;color:#aeb8c8;margin-top:5px;line-height:1.5}.note{font-size:12px;color:#c4ccda;line-height:1.55;background:#101827;padding:10px;border-radius:10px;margin-top:10px}
+button{width:100%;padding:13px;border:0;border-radius:11px;background:#334155;color:#fff;font-size:15px;margin-top:10px}footer{text-align:center;color:#748096;font-size:11px;padding:10px}
+@media(max-width:480px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header><h1>🔋 航模電池換算器</h1><div class="sub">電池・Wh・價格・充電・放電・多種電池</div></header>
+<main>
+<section class="card">
+<h2>⚙️ 電池設定</h2>
+<div class="grid">
+<div><label>電池種類</label><select id="type">
+<option value="lipo">LiPo 鋰聚合物</option><option value="lion">Li-ion 鋰離子（18650/21700）</option>
+<option value="lifepo4">LiFePO₄ 磷酸鐵鋰</option><option value="lifepo">LiFe 鋰鐵</option><option value="lead">鉛酸</option><option value="custom">自訂</option></select></div>
+<div><label>單節標稱電壓 V</label><input id="vcell" type="number" value="3.70" min="0.1" step="0.01"></div>
+<div><label>容量 mAh（單組並聯容量）</label><input id="mah" type="number" value="850" min="0" step="1"></div>
+<div><label>串聯 S</label><input id="s" type="number" value="3" min="1" step="1"></div>
+<div><label>並聯 P</label><input id="p" type="number" value="1" min="1" step="1"></div>
+<div><label>電池價格 $</label><input id="price" type="number" value="500" min="0" step="1"></div>
+</div>
+<div class="note">可直接改「單節標稱電壓」。P 代表並聯組數；容量 mAh 視為單一並聯組容量，所以總容量 = mAh × P。</div>
+<button onclick="resetAll()">恢復 3S 850mAh LiPo 範例</button>
+</section>
+
+<section class="card"><h2>1️⃣ 計算電池單位換算</h2><div class="small">Wh = mAh ÷ 1000 × P × S × 單節標稱電壓</div>
+<div class="result"><div class="big" id="wh">— Wh</div><div class="small" id="packv">— V・— Ah</div></div></section>
+
+<section class="card"><h2>2️⃣ 價錢計算</h2>
+<div class="result"><div class="big" id="pricewh">— $ / Wh</div><div class="small" id="whdollar">— Wh / $100</div></div>
+<div class="note">$ / Wh 越低越划算；Wh / $100 越高越划算。</div></section>
+
+<section class="card"><h2>3️⃣ 電池輸出功率和電流</h2>
+<label>放電倍率 C</label><input id="c" type="number" value="1" min="0" step="0.1">
+<div class="result"><div class="big" id="out">— A・— W</div><div class="small">A = Ah × C；W = Wh × C（以標稱電壓估算）</div></div></section>
+
+<section class="card"><h2>4️⃣ 電池可用能量</h2>
+<label>充電器／轉換器效率 %</label><input id="eff" type="number" value="90" min="1" max="100" step="1">
+<div class="result"><div class="big" id="usable">— Wh</div><div class="small">可用能量 = 電池 Wh × 效率</div></div></section>
+
+<section class="card"><h2>5️⃣ 充電所需電流</h2>
+<label>充電倍率 C</label><input id="cc" type="number" value="1" min="0" step="0.1">
+<div class="result"><div class="big" id="chargea">— A</div><div class="small" id="chargew">約 — W</div></div></section>
+
+<section class="card"><h2>6️⃣ 電池充電時間</h2>
+<div class="grid">
+<div><label>目前電量 %</label><input id="soc" type="number" value="20" min="0" max="100" step="1"></div>
+<div><label>充電器效率 %</label><input id="ceff" type="number" value="90" min="1" max="100" step="1"></div>
+</div>
+<div class="result"><div class="big" id="ctime">— 小時</div><div class="small" id="ctimedetail">— 分鐘</div></div>
+<div class="note">估算公式：需要補回的 Ah ÷ 充電電流，再用效率修正。實際 LiPo/Li-ion 在 CC/CV、平衡充尾段會變慢，因此實際時間通常會比理論值長。</div></section>
+
+<section class="card"><h2>7️⃣ 預算能買多少 Wh</h2>
+<div class="grid">
+<div><label>預算 $</label><input id="budget" type="number" value="1000" min="0" step="1"></div>
+<div><label>每 Wh 價格 $/Wh（可自動帶入）</label><input id="costperwh" type="number" value="0" min="0" step="0.01"></div>
+</div>
+<div class="result"><div class="big" id="buywh">— Wh</div><div class="small" id="buydetail">輸入預算與每 Wh 價格</div></div>
+<div class="note">例如「$1000 ÷ $5/Wh = 200Wh」。也可把「$100 ÷ 單位價格」理解成每 $100 可買多少 Wh。</div></section>
+
+<section class="card"><h2>📌 電池快速資料</h2>
+<div class="result"><div class="big" id="summary">—</div><div class="small" id="voltageInfo">—</div></div></section>
+</main>
+<footer>離線可用・所有數值為理論估算；實際會受電池化學種類、溫度、內阻、充電器與末段充電效率影響。</footer>
+<script>
+const $=id=>document.getElementById(id), n=id=>parseFloat($(id).value)||0;
+const presets={lipo:[3.70,4.20,3.80],lion:[3.60,4.20,3.60],lifepo4:[3.20,3.65,3.30],lifepo:[3.30,3.60,3.30],lead:[2.00,2.40,2.10],custom:[3.70,4.20,3.70]};
+function calc(){
+let mah=n('mah'),s=n('s'),p=n('p'),v=n('vcell'),ah=mah/1000*p,packV=s*v,wh=ah*packV;
+$('wh').textContent=wh.toFixed(2)+' Wh'; $('packv').textContent=packV.toFixed(2)+' V・'+ah.toFixed(3)+' Ah';
+let price=n('price'),pw=wh?price/wh:0;$('pricewh').textContent=wh?'$ '+pw.toFixed(3)+' / Wh':'—';$('whdollar').textContent=price?(wh/price*100).toFixed(2)+' Wh / $100':'—';
+let c=n('c'),oa=ah*c,ow=wh*c;$('out').textContent=oa.toFixed(2)+' A・'+ow.toFixed(2)+' W';
+$('usable').textContent=(wh*n('eff')/100).toFixed(2)+' Wh';
+let cc=n('cc'),ca=ah*cc,cw=ca*packV;$('chargea').textContent=ca.toFixed(2)+' A';$('chargew').textContent='約 '+cw.toFixed(2)+' W';
+let soc=Math.min(100,Math.max(0,n('soc'))),ce=Math.max(1,n('ceff'))/100,needAh=ah*(1-soc/100),hours=cc>0?needAh/(ah*cc)/ce:0;
+$('ctime').textContent=hours.toFixed(2)+' 小時';$('ctimedetail').textContent=(hours*60).toFixed(0)+' 分鐘（理論估算）';
+let budget=n('budget'),cpw=n('costperwh')||pw,bw=cpw>0?budget/cpw:0;$('buywh').textContent=bw.toFixed(2)+' Wh';$('buydetail').textContent=cpw>0?'$'+budget.toFixed(0)+' ÷ $'+cpw.toFixed(3)+'/Wh':'請輸入每 Wh 價格';
+$('summary').textContent=`${s}S${p>1?p+'P':''} ${mah.toFixed(0)}mAh = ${wh.toFixed(2)}Wh`;
+let pr=presets[$('type').value]||presets.custom;$('voltageInfo').textContent=`標稱 ${v.toFixed(2)}V/節・滿電參考 ${pr[1].toFixed(2)}V/節・低電/儲存參考 ${pr[2].toFixed(2)}V/節`;
+}
+$('type').addEventListener('change',()=>{let pr=presets[$('type').value];if($('type').value!=='custom')$('vcell').value=pr[0].toFixed(2);calc()});
+document.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',calc));
+function resetAll(){$('type').value='lipo';$('vcell').value='3.70';$('mah').value=850;$('s').value=3;$('p').value=1;$('price').value=500;$('c').value=1;$('cc').value=1;$('eff').value=90;$('soc').value=20;$('ceff').value=90;$('budget').value=1000;calc()}
+calc();
+
+</script></body></html>

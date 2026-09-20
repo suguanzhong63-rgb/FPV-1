@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>航模電池換算器</title>
+<style>
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;margin:0;background:#f4f6f8;color:#17202a}
+header{background:#17202a;color:white;padding:18px 20px}
+main{max-width:1100px;margin:auto;padding:16px}
+.card{background:white;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px #0001}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label{font-size:13px;font-weight:700;display:block;margin-bottom:5px}
+input,select,button{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccd3da;border-radius:9px;font-size:15px;background:white}
+button{cursor:pointer;font-weight:700}
+.row{display:flex;gap:8px;align-items:end}.row>*{flex:1}
+.result{font-size:18px;font-weight:800;margin-top:12px}
+.small{font-size:12px;color:#66717c}
+table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #e7eaed;text-align:left;font-size:14px}
+.actions{display:flex;gap:8px;margin-top:10px}.actions button{width:auto}
+.good{font-weight:800}
+</style>
+</head>
+<body>
+<header><h1>🔋 航模電池換算器</h1><div>容量、Wh、價格、輸出功率、充電時間、充電顆數與比價</div></header>
+<main>
+<div class="card">
+<h2>電池基本設定</h2>
+<div class="grid">
+<div><label>電池種類</label><select id="chem"></select></div>
+<div><label>單節標稱電壓 (V)</label><input id="nomV" type="number" step="0.01"></div>
+<div><label>單節滿電電壓 (V)</label><input id="fullV" type="number" step="0.01"></div>
+<div><label>單節儲存電壓 (V)</label><input id="storeV" type="number" step="0.01"></div>
+<div><label>單節最低電壓 (V)</label><input id="minV" type="number" step="0.01"></div>
+<div><label>容量 mAh</label><input id="mah" type="number" min="0" step="1" value="1300"></div>
+<div><label>S 串聯</label><input id="s" type="number" min="1" step="1" value="6"></div>
+<div><label>P 並聯</label><input id="p" type="number" min="1" step="1" value="1"></div>
+<div><label>價格 $</label><input id="price" type="number" min="0" step="0.01" value="20"></div>
+<div><label>放電 C</label><input id="c" type="number" min="0" step="0.1" value="100"></div>
+</div>
+</div>
+
+<div class="card">
+<h2>1～6｜電池換算</h2>
+<div class="grid">
+<div><label>充電倍率 C</label><input id="chargeC" type="number" min="0" step="0.1" value="2"></div>
+<div><label>充電器輸出效率</label><input id="eff" type="number" min="0.01" max="1" step="0.01" value="0.8"></div>
+<div><label>充電器輸出功率上限 (W)</label><input id="chargerW" type="number" min="0" step="1" value="100"></div>
+<div><label>電池充電至滿電的容量比例</label><input id="chargePct" type="number" min="0" max="100" step="1" value="100"></div>
+</div>
+<div id="calc" class="result"></div>
+<div class="small">說明：Wh 以單節標稱電壓計算；充電功率以滿電總電壓估算。充電時間會依充電器限功率與效率做估算。</div>
+</div>
+
+<div class="card">
+<h2>7｜一顆外部電源可以幫小電池充幾顆？</h2>
+<div class="grid">
+<div><label>外部電源可用容量 (Wh)</label><input id="sourceWh" type="number" min="0" step="0.1" value="90.8"></div>
+<div><label>每顆小電池容量 (mAh)</label><input id="smallMah" type="number" min="0" value="650"></div>
+<div><label>小電池 S</label><input id="smallS" type="number" min="1" value="3"></div>
+<div><label>小電池 P</label><input id="smallP" type="number" min="1" value="1"></div>
+<div><label>小電池單節標稱電壓 (V)</label><input id="smallV" type="number" step="0.01" value="3.7"></div>
+<div><label>充電補入比例</label><input id="smallPct" type="number" min="1" max="100" value="100"></div>
+</div>
+<div id="smallCalc" class="result"></div>
+</div>
+
+<div class="card">
+<h2>8｜比較電池（$/Wh）</h2>
+<div id="compareRows"></div>
+<div class="actions">
+<button onclick="addRow()">＋新增電池</button>
+<button onclick="sortRows()">依 $/Wh 由低到高</button>
+</div>
+<div id="compareResult"></div>
+</div>
+</main>
+
+<script>
+const presets={
+"LiPo 鋰聚合物":{nom:3.7,full:4.2,store:3.8,min:3.5},
+"LiHV 高壓鋰":{nom:3.8,full:4.35,store:3.85,min:3.6},
+"Li-ion 18650":{nom:3.6,full:4.2,store:3.7,min:2.8},
+"LiFePO4 磷酸鐵鋰":{nom:3.2,full:3.65,store:3.3,min:2.8},
+"鉛酸":{nom:2.0,full:2.4,store:2.1,min:1.75},
+"自訂":{nom:3.7,full:4.2,store:3.8,min:3.5}
+};
+const chem=document.getElementById('chem');
+Object.keys(presets).forEach(x=>chem.add(new Option(x,x)));
+chem.value="LiPo 鋰聚合物";
+function $(id){return document.getElementById(id)}
+chem.onchange=()=>{let x=presets[chem.value]; ['nomV','fullV','storeV','minV'].forEach((id,i)=>$(id).value=[x.nom,x.full,x.store,x.min][i]); calc()};
+['nomV','fullV','storeV','minV','mah','s','p','price','c','chargeC','eff','chargerW','chargePct','sourceWh','smallMah','smallS','smallP','smallV','smallPct'].forEach(id=>$(id).addEventListener('input',()=>{calc();smallCalc()}));
+
+function calc(){
+let mah=+$('mah').value||0,s=+$('s').value||1,p=+$('p').value||1,nom=+$('nomV').value||0,full=+$('fullV').value||0,price=+$('price').value||0,c=+$('c').value||0,cc=+$('chargeC').value||0,eff=+$('eff').value||1,cw=+$('chargerW').value||0,pct=(+$('chargePct').value||100)/100;
+let totalMah=mah*p, wh=totalMah/1000*s*nom, fullW=totalMah/1000*s*full*c, amps=totalMah/1000*c, chargeW=Math.min(fullW, cw*eff), time=chargeW? (wh*pct/chargeW*60):0;
+$('calc').innerHTML=`標稱總電壓：${(nom*s).toFixed(2)} V　｜滿電總電壓：${(full*s).toFixed(2)} V<br>
+容量：${totalMah.toFixed(0)} mAh　｜<b>${wh.toFixed(2)} Wh</b>　｜價格：$${price.toFixed(2)}　｜$ / Wh：${wh?(price/wh).toFixed(3):'—'}<br>
+最大理論放電：<b>${amps.toFixed(2)} A</b>　｜${fullW.toFixed(1)} W　｜估算充電時間：<b>${time.toFixed(1)} 分鐘</b>`;
+}
+function smallCalc(){
+let src=+$('sourceWh').value||0,mah=+$('smallMah').value||0,s=+$('smallS').value||1,p=+$('smallP').value||1,v=+$('smallV').value||0,pct=(+$('smallPct').value||100)/100;
+let wh=mah*p/1000*s*v; $('smallCalc').innerHTML=`小電池每顆約 <b>${wh.toFixed(2)} Wh</b>　｜外部電源約可補 <b>${wh?Math.floor(src/wh*pct):0} 顆</b>（僅能量估算，未扣除額外轉換損耗）`;
+}
+let rows=[
+{name:"5\" 6S 1300mAh",mah:1300,s:6,p:1,price:20,chem:"LiPo 鋰聚合物"},
+{name:"5\" 6S 1500mAh",mah:1500,s:6,p:1,price:22,chem:"LiPo 鋰聚合物"}
+];
+function addRow(){rows.push({name:"新電池",mah:1000,s:1,p:1,price:10,chem:"LiPo 鋰聚合物"});renderRows()}
+function renderRows(){
+let h='<table><tr><th>名稱</th><th>種類</th><th>mAh</th><th>S</th><th>P</th><th>價格</th><th>Wh</th><th>$/Wh</th></tr>';
+rows.forEach((r,i)=>{let v=presets[r.chem].nom,wh=r.mah*r.p/1000*r.s*v,sp=wh?r.price/wh:0;
+h+=`<tr><td><input value="${r.name}" onchange="rows[${i}].name=this.value"></td><td><select onchange="rows[${i}].chem=this.value;renderRows()">${Object.keys(presets).filter(x=>x!="自訂").map(x=>`<option ${x==r.chem?'selected':''}>${x}</option>`).join('')}</select></td><td><input type=number value=${r.mah} onchange="rows[${i}].mah=+this.value;renderRows()"></td><td><input type=number value=${r.s} onchange="rows[${i}].s=+this.value;renderRows()"></td><td><input type=number value=${r.p} onchange="rows[${i}].p=+this.value;renderRows()"></td><td><input type=number value=${r.price} onchange="rows[${i}].price=+this.value;renderRows()"></td><td>${wh.toFixed(2)}</td><td class=good>${sp.toFixed(3)}</td></tr>`});
+h+='</table>'; $('compareRows').innerHTML=h;
+let best=[...rows].map((r,i)=>{let v=presets[r.chem].nom,wh=r.mah*r.p/1000*r.s*v;return {i,sp:wh?r.price/wh:Infinity}}).sort((a,b)=>a.sp-b.sp)[0];
+$('compareResult').innerHTML=best?`<p>🏆 最便宜：第 ${best.i+1} 顆，約 <b>$${best.sp.toFixed(3)}/Wh</b></p>`:'';
+}
+function sortRows(){rows.sort((a,b)=>a.price/(a.mah*a.p/1000*a.s*presets[a.chem].nom)-b.price/(b.mah*b.p/1000*b.s*presets[b.chem].nom));renderRows()}
+renderRows();calc();smallCalc();
+</script>
+</body></html>
